@@ -59,3 +59,138 @@ def get_containers():
                    "title": api.get_object(brain).get_full_title()}
                   for brain in brains]
     return sorted(containers, key=lambda item: item["title"])
+
+
+# ---- helpers of the reports
+
+if HAS_STORAGE:
+    from nmrl.lims.storage.config import DISPOSAL_METHODS
+    from nmrl.lims.storage.config import TRANSACTION_DISPOSE
+    from nmrl.lims.storage.config import TRANSACTION_RETRIEVE
+    from nmrl.lims.storage.config import TRANSACTION_RETURN
+else:  # pragma: no cover
+    DISPOSAL_METHODS = ()
+    TRANSACTION_DISPOSE = TRANSACTION_RETRIEVE = TRANSACTION_RETURN = None
+
+
+def to_date(value):
+    """A date from a date, a datetime or a DateTime; None when empty"""
+    if not value:
+        return None
+    if hasattr(value, "asdatetime"):
+        return value.asdatetime().date()
+    if hasattr(value, "date") and callable(value.date):
+        return value.date()
+    return value
+
+
+def iso(value):
+    """A date as text (YYYY-MM-DD), empty without one"""
+    day = to_date(value)
+    return day.isoformat() if day else u""
+
+
+def date_in(value, daterange):
+    """Whether the day of `value` is in the range (from, to), either end
+    open. Without a range everything is in; a value without a date is not in
+    a range that was given
+    """
+    if not daterange:
+        return True
+    day = to_date(value)
+    if day is None:
+        return False
+    start, end = daterange
+    return (not start or day >= start) and (not end or day <= end)
+
+
+def created_query(daterange):
+    """The catalog query of a range of the `created` index"""
+    from DateTime import DateTime
+    if not daterange:
+        return None
+    start, end = daterange
+    start = start and DateTime(start.isoformat() + " 00:00:00")
+    end = end and DateTime(end.isoformat() + " 23:59:59")
+    if start and end:
+        return {"query": [start, end], "range": "min:max"}
+    return {"query": start or end, "range": "min" if start else "max"}
+
+
+def state_title(obj):
+    """The title of the state of an object, as people see it"""
+    tool = api.get_tool("portal_workflow")
+    state = api.get_review_status(obj)
+    workflow = tool.getWorkflowsFor(obj)[0]
+    return workflow.states[state].title if state in workflow.states \
+        else state
+
+
+def project_title(uid, cache=None):
+    """The code and title of a project; empty without one"""
+    if not uid:
+        return u""
+    if cache is not None and uid in cache:
+        return cache[uid]
+    project = api.get_object_by_uid(uid, None)
+    title = project.get_full_title() if project is not None else u""
+    if cache is not None:
+        cache[uid] = title
+    return title
+
+
+def get_project_samples(project=None, review_state=None, sampletype=None,
+                        created=None):
+    """The samples that belong to a project (the given one or any), as
+    objects, by project and then by date. Optionally in a state, of a sample
+    type and registered in a range
+    """
+    from senaite.core.catalog import SAMPLE_CATALOG
+    uids = [project] if project else [p["uid"] for p in get_projects()]
+    if not uids:
+        return []
+    query = {"portal_type": "AnalysisRequest", "project_uid": uids}
+    if review_state:
+        query["review_state"] = review_state
+    if sampletype:
+        query["getSampleTypeUID"] = sampletype
+    date_query = created_query(created)
+    if date_query:
+        query["created"] = date_query
+    samples = [api.get_object(brain)
+               for brain in api.search(query, SAMPLE_CATALOG)]
+    titles = {}
+    return sorted(samples, key=lambda sample: (
+        project_title(sapi.get_sample_project_uid(sample), titles).lower(),
+        sample.created()))
+
+
+def get_lines(transaction_type, review_state=None):
+    """The storage transactions (the lines of the requests) of a type"""
+    query = {"portal_type": "StorageTransaction",
+             "transaction_type": transaction_type}
+    if review_state:
+        query["review_state"] = review_state
+    return [api.get_object(brain)
+            for brain in api.search(query, STORAGE_CATALOG)]
+
+
+def sample_of(line):
+    return api.get_object_by_uid(line.sample_uid, None)
+
+
+def sample_type_uid(sample):
+    sample_type = sample.getSampleType()
+    return api.get_uid(sample_type) if sample_type else None
+
+
+def position_label(sample):
+    """The container of the sample and the label of its position"""
+    container = sapi.get_container(sample)
+    if container is None:
+        return None, u""
+    position = container.get_object_position(sample)
+    label = u""
+    if position and container.requires_position_tracking():
+        label = container.position_to_alpha(*position)
+    return container, label

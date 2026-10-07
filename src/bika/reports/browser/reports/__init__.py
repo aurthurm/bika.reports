@@ -435,3 +435,7 @@ class SubmitForm(BrowserView):
         setheader("Pragma", "no-cache")
         self.logger.info("Add PDF to response")
         self.request.response.write(pdf)
+
+
+# the storage reports register themselves
+from bika.reports.browser.reports.storage import projects  # noqa: E402,F401

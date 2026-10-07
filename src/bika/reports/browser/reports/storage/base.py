@@ -97,6 +97,8 @@ class StorageReport(BrowserView):
             return u""
         if isinstance(value, (datetime.date, datetime.datetime)):
             return value.isoformat()[:16].replace("T", " ")
+        if isinstance(value, (int, long, float)):
+            return u"{}".format(value)
         return safe_unicode(value)
 
     def csv_data(self, rows):
