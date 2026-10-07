@@ -158,6 +158,31 @@ class Container(_Select):
         return data.get_containers()
 
 
+class _Known(_Select):
+    """A choice among what exists, and any other value is used as typed: a
+    user or a reason that was never recorded matches nothing, it does not
+    show everything
+    """
+
+    def parse(self, request):
+        value = _text(request.form.get(self.name))
+        return Parsed(value, value) if value else Parsed()
+
+
+class Requester(_Known):
+    blank = _(u"All requesters")
+
+    def items(self):
+        return data.get_requesters()
+
+
+class Reason(_Known):
+    blank = _(u"All reasons")
+
+    def items(self):
+        return data.get_reasons()
+
+
 class Choice(_Select):
     """One of a fixed list of `options`: ((value, label), ...)"""
 

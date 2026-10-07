@@ -248,3 +248,44 @@ def get_stored_or_disposed(state, values):
         query["getSampleTypeUID"] = values["sampletype"]
     return [api.get_object(brain)
             for brain in api.search(query, SAMPLE_CATALOG)]
+
+
+def get_requests(states=None, transaction_type=None):
+    """The storage requests, as objects, optionally in some states and of a
+    type
+    """
+    query = {"portal_type": "StorageRequest"}
+    if states:
+        query["review_state"] = states
+    requests = [api.get_object(brain)
+                for brain in api.search(query, STORAGE_CATALOG)]
+    if transaction_type:
+        requests = [request for request in requests
+                    if request.transaction_type == transaction_type]
+    return requests
+
+
+def get_requesters():
+    """The users that made storage requests: [{uid, title}] (the id is both)
+    """
+    if not HAS_STORAGE:
+        return []
+    found = set()
+    for brain in api.search({"portal_type": ["StorageRequest",
+                                             "StorageTransaction"]},
+                            STORAGE_CATALOG):
+        requester = getattr(brain, "requester", None)
+        if requester:
+            found.add(requester)
+    return [{"uid": user, "title": user} for user in sorted(found)]
+
+
+def get_reasons():
+    """The reasons that retrievals were requested for: [{uid, title}]"""
+    if not HAS_STORAGE:
+        return []
+    reasons = set()
+    for line in get_lines(TRANSACTION_RETRIEVE):
+        if line.reason:
+            reasons.add(line.reason)
+    return [{"uid": reason, "title": reason} for reason in sorted(reasons)]

@@ -85,7 +85,8 @@ class TestEngine(ReportsTestCase):
     def test_the_registry_lists_the_reports_of_a_category(self):
         self.assertIn("storage_stub", [
             r.id for r in self.registry.get_reports("project")])
-        self.assertEqual(self.registry.get_reports("retrieval"), [])
+        self.assertNotIn("storage_stub", [
+            r.id for r in self.registry.get_reports("retrieval")])
         self.assertIs(self.registry.get_report_class("storage_stub"),
                       self.Stub)
         self.assertIsNone(self.registry.get_report_class("storage_nothing"))
