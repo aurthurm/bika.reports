@@ -19,6 +19,7 @@
 # Some rights reserved, see README and LICENSE.
 
 import bs4
+from AccessControl import Unauthorized
 import collections
 import importlib
 import os
@@ -40,6 +41,8 @@ from bika.lims.utils import createPdf
 
 from bika.reports import _
 from bika.reports.browser.reports.selection_macros import SelectionMacrosView
+from bika.reports.browser.reports.storage import data as storage_data
+from bika.reports.browser.reports.storage import registry as storage_registry
 from bika.reports.interfaces import IAdministrationReport
 from bika.reports.interfaces import IProductivityReport
 from senaite.app.listing import ListingView
@@ -98,6 +101,45 @@ class AdministrationView(BrowserView):
             self.additional_reports.append(report_dict)
 
         return self.template()
+
+
+class StorageView(BrowserView):
+    """The Storage tab: the storage reports, in their three sections"""
+
+    implements(IViewView)
+    template = ViewPageTemplateFile("templates/storage.pt")
+
+    def __init__(self, context, request):
+        BrowserView.__init__(self, context, request)
+        self.context = context
+        self.request = request
+
+    def __call__(self):
+        if not storage_data.can_use_storage(self.context):
+            raise Unauthorized("Storage reports")
+        self.selection_macros = SelectionMacrosView(self.context, self.request)
+        self.icon = self.portal_url + "/++resource++bika.lims.images/report_big.png"
+        return self.template()
+
+    def has_storage(self):
+        return storage_data.HAS_STORAGE
+
+    def get_sections(self):
+        """The sections of the page, each with its reports and their forms"""
+        sections = []
+        for category, title in storage_registry.CATEGORIES:
+            reports = []
+            for report_class in storage_registry.get_reports(category):
+                report = report_class(self.context, self.request)
+                reports.append({
+                    "id": report_class.id,
+                    "title": report_class.title,
+                    "description": report_class.description,
+                    "form": report.form_html(),
+                })
+            sections.append({"id": category, "title": title,
+                             "reports": reports})
+        return sections
 
 
 class ReportHistoryView(ListingView):
@@ -210,6 +252,9 @@ class SubmitForm(BrowserView):
         sets it up: the productivity form (the default) or the administration
         one
         """
+        if self.is_storage():
+            # the Storage page builds its own forms
+            return
         self.selection_macros = SelectionMacrosView(self.context, self.request)
         self.icon = self.portal_url + "/++resource++bika.lims.images/report_big.png"
         interface = IProductivityReport
@@ -226,8 +271,13 @@ class SubmitForm(BrowserView):
             report_dict["id"] = name
             self.additional_reports.append(report_dict)
 
+    def is_storage(self):
+        return self.request.get("report_id", "").startswith("storage_")
+
     def render_form(self):
         """The form the report was asked from, with its message"""
+        if self.is_storage():
+            return StorageView(self.context, self.request)()
         if self.is_administration():
             return self.administration_template()
         return self.template()
@@ -242,6 +292,9 @@ class SubmitForm(BrowserView):
             return
 
         self.report_id = self.request.get("report_id", "")
+        if self.is_storage() and not storage_data.can_use_storage(
+                self.context):
+            raise Unauthorized("Storage reports")
         # if there's an error, we show the form again: it needs these
         self.prepare_form()
         if not self.report_id:
@@ -290,20 +343,32 @@ class SubmitForm(BrowserView):
         # once the PDF has been generated.  temporary plot image files, etc.
         self.request["to_remove"] = []
 
-        if "report_module" in self.request:
-            module = self.request["report_module"]
+        if self.is_storage():
+            # the storage reports are found in their registry, never by a
+            # module name taken from the request
+            Report = storage_registry.get_report_class(self.report_id)
+            if Report is None:
+                message = "Report %s not found" % self.report_id
+                self.logger.error(message)
+                self.context.plone_utils.addPortalMessage(message, "error")
+                return self.render_form()
         else:
-            module = "bika.reports.browser.reports.%s" % self.report_id
-        try:
-            Report = getattr(importlib.import_module(module), "Report")
-            # required during error redirect: the report must have a copy of
-            # additional_reports, because it is used as a surrogate view.
-            Report.additional_reports = self.additional_reports
-        except (ImportError, AttributeError):
-            message = "Report %s.Report not found (shouldn't happen)" % module
-            self.logger.error(message)
-            self.context.plone_utils.addPortalMessage(message, "error")
-            return self.render_form()
+            if "report_module" in self.request:
+                module = self.request["report_module"]
+            else:
+                module = "bika.reports.browser.reports.%s" % self.report_id
+            try:
+                Report = getattr(importlib.import_module(module), "Report")
+                # required during error redirect: the report must have a copy
+                # of additional_reports, because it is used as a surrogate
+                # view.
+                Report.additional_reports = self.additional_reports
+            except (ImportError, AttributeError):
+                message = ("Report %s.Report not found (shouldn't happen)"
+                           % module)
+                self.logger.error(message)
+                self.context.plone_utils.addPortalMessage(message, "error")
+                return self.render_form()
 
         # Report must return dict with:
         # - report_title - title string for pdf/history listing

@@ -6,11 +6,8 @@ import importlib
 import os
 import unittest
 
-from bika.lims import api
 from bika.reports.interfaces import IBikaReportsLayer
 from bika.reports.tests.base import ReportsTestCase
-from plone.app.testing import TEST_USER_ID
-from plone.app.testing import setRoles
 from zope.interface import alsoProvides
 
 REPORTS_DIR = os.path.join(
@@ -80,10 +77,6 @@ class TestAdministrationReports(ReportsTestCase):
         super(TestAdministrationReports, self).setUp()
         alsoProvides(self.request, IBikaReportsLayer)
         self.folder = self.portal.reports
-        setRoles(self.portal, TEST_USER_ID, ["LabManager", "Manager"])
-        client = api.create(self.portal.clients, "Client", Name="Happy Hills",
-                            ClientID="HH")
-        api.create(client, "Contact", Firstname="Rita", Lastname="Mohale")
 
     def run_report(self, report_id, **form):
         self.request.form.clear()

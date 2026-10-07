@@ -30,6 +30,13 @@
     />
     <browser:page
       for="bika.reports.interfaces.IReportFolder"
+      name="storage"
+      class="bika.reports.browser.reports.StorageView"
+      permission="zope2.View"
+      layer="bika.reports.interfaces.IBikaReportsLayer"
+    />
+    <browser:page
+      for="bika.reports.interfaces.IReportFolder"
       name="createreport"
       class="bika.reports.browser.reports.SubmitForm"
       permission="zope2.View"

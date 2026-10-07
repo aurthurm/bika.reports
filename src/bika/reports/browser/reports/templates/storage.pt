@@ -1,0 +1,81 @@
+<html xmlns="http://www.w3.org/1999/xhtml"
+      xmlns:tal="http://xml.zope.org/namespaces/tal"
+      xmlns:metal="http://xml.zope.org/namespaces/metal"
+      metal:use-macro="here/main_template/macros/master"
+      i18n:domain="bika.reports">
+
+  <head>
+    <metal:block fill-slot="head_slot">
+      <style media="screen" type="text/css">
+       h2 { font-size: 1.1em; margin: 15px 0px; }
+       #content-core div fieldset { border-style: none; }
+       ul.toc-reports { list-style-type: square; color: #CDCDCD; }
+       ul.toc-reports li { color: #333; padding-bottom: 10px; }
+       ul.toc-reports li span { font-size: 0.9em; }
+       ul.toc-reports li div.criteria { margin: 8px 0 0 0; }
+       ul.toc-reports li div.criteria div.field { margin-bottom: 6px; }
+       ul.toc-reports li div.criteria div.field label {
+         display: inline-block; min-width: 170px; }
+      </style>
+    </metal:block>
+    <metal:block fill-slot="senaite_legacy_resources"
+                 tal:define="portal context/@@plone_portal_state/portal;">
+      <script type="text/javascript"
+              tal:attributes="src string:${portal/absolute_url}/++plone++bika.reports/js/bika.lims.reports.js"></script>
+    </metal:block>
+  </head>
+
+  <body>
+
+    <metal:content-title fill-slot="content-title">
+      <h1 i18n:translate="">Storage Reports</h1>
+    </metal:content-title>
+
+    <metal:content-description fill-slot="content-description">
+    </metal:content-description>
+
+    <metal:content-core fill-slot="content-core">
+      <input tal:replace="structure context/@@authenticator/authenticator"/>
+
+      <p tal:condition="not:view/has_storage" i18n:translate="">
+        The storage reports need the storage module of nmrl.lims, which is
+        not installed.
+      </p>
+
+      <div tal:condition="view/has_storage">
+        <fieldset tal:repeat="section view/get_sections">
+          <h2 tal:attributes="id string:section-${section/id}"
+              tal:content="section/title"/>
+          <p class="discreet" tal:condition="not:section/reports"
+             i18n:translate="">There are no reports in this section.</p>
+          <ul class="toc-reports" tal:condition="section/reports">
+            <li tal:repeat="report section/reports">
+              <a href="#"
+                 tal:attributes="id string:${report/id}_selector"
+                 tal:content="report/title"/>
+              <br/>
+              <span tal:content="report/description"/>
+
+              <div tal:attributes="id report/id" style="display:none"
+                   class="criteria">
+                <form action="createreport" method="post"
+                      tal:attributes="action string:${here/absolute_url}/createreport;
+                                      name report/id">
+                  <input type="hidden" name="report_id"
+                         tal:attributes="value report/id"/>
+                  <span tal:replace="structure report/form"/>
+                  <input tabindex=""
+                         class="searchButton allowMultiSubmit"
+                         type="submit"
+                         name="submit"
+                         value="Generate report"
+                         i18n:attributes="value"/>
+                </form>
+              </div>
+            </li>
+          </ul>
+        </fieldset>
+      </div>
+    </metal:content-core>
+  </body>
+</html>

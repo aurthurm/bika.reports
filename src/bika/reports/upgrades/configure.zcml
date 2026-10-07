@@ -11,4 +11,12 @@
      handler="bika.reports.upgrades.v01_00_001.upgrade"
      profile="bika.reports:default"/>
 
+  <genericsetup:upgradeStep
+     title="Upgrade to BIKA.REPORTS 1.0.2"
+     description="Add the Storage tab to the reports"
+     source="1.0.1"
+     destination="1.0.2"
+     handler="bika.reports.upgrades.v01_00_002.upgrade"
+     profile="bika.reports:default"/>
+
 </configure>

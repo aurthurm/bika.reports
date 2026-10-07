@@ -1,17 +1,17 @@
 # -*- coding: utf-8 -*-
 #
-# Tests of the reports that run on SENAITE: the plain Plone fixture of the
-# scaffold has no bika.lims in it.
+# Tests of the reports that run on SENAITE with the storage module of
+# nmrl.lims: the plain Plone fixture of the scaffold has no bika.lims in it.
 
 import transaction
+from nmrl.lims.storage.tests.base import StorageTestCase
+from nmrl.lims.storage.tests.base import StorageTestLayer
 from plone.app.testing import FunctionalTesting
 from plone.app.testing import applyProfile
 from plone.testing import zope
-from senaite.core.tests.base import BaseTestCase
-from senaite.core.tests.layers import BaseLayer
 
 
-class ReportsLayer(BaseLayer):
+class ReportsLayer(StorageTestLayer):
 
     def setUpZope(self, app, configurationContext):
         super(ReportsLayer, self).setUpZope(app, configurationContext)
@@ -32,5 +32,7 @@ REPORTS_TESTING = FunctionalTesting(
 )
 
 
-class ReportsTestCase(BaseTestCase):
+class ReportsTestCase(StorageTestCase):
+    """A test case with a client, a contact and a sample type, and the helpers
+    of the storage tests (stored samples, projects, requests)"""
     layer = REPORTS_TESTING
