@@ -194,3 +194,57 @@ def position_label(sample):
     if position and container.requires_position_tracking():
         label = container.position_to_alpha(*position)
     return container, label
+
+
+def get_container_objects(uid=None):
+    """The sample containers (or the one with the UID) as objects, by full
+    title"""
+    if not HAS_STORAGE:
+        return []
+    from senaite.storage.catalog import STORAGE_CATALOG as CONTAINERS
+    query = {"portal_type": "StorageSamplesContainer"}
+    if uid:
+        query["UID"] = uid
+    containers = [api.get_object(brain)
+                  for brain in api.search(query, CONTAINERS)]
+    return sorted(containers, key=lambda item: item.get_full_title())
+
+
+def get_stored_samples(project=None, sampletype=None, container=None):
+    """The samples that are in storage now, optionally of a project, of a
+    sample type and in a container (by UID)
+    """
+    from senaite.core.catalog import SAMPLE_CATALOG
+    query = {"portal_type": "AnalysisRequest", "review_state": "stored"}
+    if project:
+        query["project_uid"] = project
+    if sampletype:
+        query["getSampleTypeUID"] = sampletype
+    if container:
+        found = get_container_objects(container)
+        uids = found[0].get_samples_uids() if found else []
+        if not uids:
+            return []
+        query["UID"] = uids
+    return [api.get_object(brain)
+            for brain in api.search(query, SAMPLE_CATALOG)]
+
+
+def position_key(sample):
+    """To put the samples of a container in the order of its positions"""
+    container = sapi.get_container(sample)
+    position = container.get_object_position(sample) if container else None
+    return position or (0, 0)
+
+
+def get_stored_or_disposed(state, values):
+    """The samples in a state (disposed), of the project and sample type of
+    the filters"""
+    from senaite.core.catalog import SAMPLE_CATALOG
+    query = {"portal_type": "AnalysisRequest", "review_state": state}
+    if values.get("project"):
+        query["project_uid"] = values["project"]
+    if values.get("sampletype"):
+        query["getSampleTypeUID"] = values["sampletype"]
+    return [api.get_object(brain)
+            for brain in api.search(query, SAMPLE_CATALOG)]

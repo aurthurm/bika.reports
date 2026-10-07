@@ -438,4 +438,5 @@ class SubmitForm(BrowserView):
 
 
 # the storage reports register themselves
+from bika.reports.browser.reports.storage import locations  # noqa: E402,F401
 from bika.reports.browser.reports.storage import projects  # noqa: E402,F401
