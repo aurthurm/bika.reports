@@ -5,7 +5,7 @@ import datetime
 from Products.CMFPlone.utils import safe_unicode
 from six import StringIO
 
-from bika.extras import _
+from bika.reports import _
 from bika.lims import api
 from bika.lims.utils import t
 from bika.reports.browser.reports.administration_arsnotinvoiced import Report as RA

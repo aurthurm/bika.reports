@@ -191,13 +191,46 @@ class SubmitForm(BrowserView):
 
     implements(IViewView)
     frame_template = ViewPageTemplateFile("templates/report_frame.pt")
-    # default and errors use this template:
+    # default and errors use the form the report was asked from
     template = ViewPageTemplateFile("templates/productivity.pt")
+    administration_template = ViewPageTemplateFile(
+        "templates/administration.pt")
 
     def __init__(self, context, request):
         BrowserView.__init__(self, context, request)
         self.context = context
         self.request = request
+
+    def is_administration(self):
+        """Whether the report was asked from the administration form"""
+        return self.request.get("report_id", "").startswith("administration")
+
+    def prepare_form(self):
+        """What the form that is shown again needs, as the view of that form
+        sets it up: the productivity form (the default) or the administration
+        one
+        """
+        self.selection_macros = SelectionMacrosView(self.context, self.request)
+        self.icon = self.portal_url + "/++resource++bika.lims.images/report_big.png"
+        interface = IProductivityReport
+        if self.is_administration():
+            interface = IAdministrationReport
+        else:
+            self.getAnalysts = getUsers(
+                self.context, ["Manager", "LabManager", "Analyst"])
+            self.last_month = (DateTime() - 30).strftime("%Y-%m-%d")
+            self.today = DateTime().strftime("%Y-%m-%d")
+        self.additional_reports = []
+        for name, adapter in getAdapters((self.context,), interface):
+            report_dict = adapter(self.context, self.request)
+            report_dict["id"] = name
+            self.additional_reports.append(report_dict)
+
+    def render_form(self):
+        """The form the report was asked from, with its message"""
+        if self.is_administration():
+            return self.administration_template()
+        return self.template()
 
     def __call__(self):
         """Create and render selected report"""
@@ -208,21 +241,14 @@ class SubmitForm(BrowserView):
             self.request.response.redirect(came_from)
             return
 
-        # if there's an error, we return productivity.pt which requires these.
-        self.selection_macros = SelectionMacrosView(self.context, self.request)
-        self.additional_reports = []
-        adapters = getAdapters((self.context,), IProductivityReport)
-        for name, adapter in adapters:
-            report_dict = adapter(self.context, self.request)
-            report_dict["id"] = name
-            self.additional_reports.append(report_dict)
-
         self.report_id = self.request.get("report_id", "")
+        # if there's an error, we show the form again: it needs these
+        self.prepare_form()
         if not self.report_id:
             message = _("No report specified in request")
             self.logger.error(message)
             self.context.plone_utils.addPortalMessage(message, "error")
-            return self.template()
+            return self.render_form()
 
         self.date = DateTime()
         username = self.context.portal_membership.getAuthenticatedMember().getUserName()
@@ -277,7 +303,7 @@ class SubmitForm(BrowserView):
             message = "Report %s.Report not found (shouldn't happen)" % module
             self.logger.error(message)
             self.context.plone_utils.addPortalMessage(message, "error")
-            return self.template()
+            return self.render_form()
 
         # Report must return dict with:
         # - report_title - title string for pdf/history listing
